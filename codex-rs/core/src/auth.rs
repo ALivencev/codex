@@ -131,12 +131,62 @@ impl AuthStorageBackend for FileAuthStorage {
     }
 }
 
+#[derive(Clone, Debug)]
+struct KeyringAuthStorage {
+    codex_home: PathBuf,
+}
+
+impl KeyringAuthStorage {
+    fn new(codex_home: PathBuf) -> Self {
+        Self { codex_home }
+    }
+}
+
+impl AuthStorageBackend for KeyringAuthStorage {
+    fn load(&self) -> std::io::Result<Option<AuthDotJson>> {
+        Ok(None)
+    }
+
+    fn save(&self, auth: &AuthDotJson) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn delete(&self) -> std::io::Result<bool> {
+        Ok(false)
+    }
+}
+
+#[derive(Clone, Debug)]
+struct AutoAuthStorage {
+    codex_home: PathBuf,
+}
+
+impl AutoAuthStorage {
+    fn new(codex_home: PathBuf) -> Self {
+        Self { codex_home }
+    }
+}
+
+impl AuthStorageBackend for AutoAuthStorage {
+    fn load(&self) -> std::io::Result<Option<AuthDotJson>> {
+        Ok(None)
+    }
+
+    fn save(&self, auth: &AuthDotJson) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn delete(&self) -> std::io::Result<bool> {
+        Ok(false)
+    }
+}
+
 fn create_auth_storage(
     codex_home: PathBuf,
     mode: AuthCredentialsStoreMode,
 ) -> Arc<dyn AuthStorageBackend> {
     match mode {
         AuthCredentialsStoreMode::File => Arc::new(FileAuthStorage::new(codex_home)),
+        AuthCredentialsStoreMode::Keyring => Arc::new(KeyringAuthStorage::new(codex_home)),
+        AuthCredentialsStoreMode::Auto => Arc::new(AutoAuthStorage::new(codex_home)),
     }
 }
 
