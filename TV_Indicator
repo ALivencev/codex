@@ -1,0 +1,157 @@
+//@version=5
+indicator("Alt-Market Regime v2.8 (TOTAL3 * OTHERS.D / ETHBTC)", overlay=false, max_labels_count=500)
+
+// === Inputs: timeframes & logic ===
+src_tf_in  = input.timeframe("12H", "Source timeframe (symbols)")
+lenFast    = input.int(55,  "WMA Fast",  minval=1)
+lenSlow    = input.int(200, "WMA Slow",  minval=2)
+smoothK    = input.int(3,   "Smoothing (WMA on ratio)", minval=1)
+
+// === Inputs: colors & visuals ===
+ratioClr   = input.color(color.blue,   "Color: Ratio line")
+fastClr    = input.color(color.orange, "Color: WMA Fast")
+slowClr    = input.color(color.red,    "Color: WMA Slow")
+
+useBg      = input.bool(true, "Show background shading")
+bgOnClr    = input.color(color.new(color.green, 0), "BG: Risk-ON")
+bgOffClr   = input.color(color.new(color.red,   0), "BG: Risk-OFF")
+transpBg   = input.int(82, "BG transparency (0..100)", minval=0, maxval=100)
+
+// Markers
+showMarks  = input.bool(true, "Show markers")
+markSize   = input.string("tiny", "Marker size", options=["tiny","small","normal","large"])
+regUpClr   = input.color(color.green,  "Marker: Regime UP")
+regDnClr   = input.color(color.red,    "Marker: Regime DOWN")
+impUpClr   = input.color(color.teal,   "Marker: Momentum UP")
+impDnClr   = input.color(color.purple, "Marker: Momentum DOWN")
+
+// Status panel & BIG badge
+showTable   = input.bool(true, "Show status table")
+tblTitleSz  = input.string("large",  "Table title size", options=["tiny","small","normal","large","huge"])
+tblInfoSz   = input.string("normal", "Table info size",  options=["tiny","small","normal","large"])
+showBadge   = input.bool(true, "Show BIG badge (mobile-friendly)")
+badgePos    = input.string("top_right", "Badge position", options=["top_right","top_left"])
+badgeScale  = input.int(130, "Badge scale %", minval=60, maxval=180)
+
+// === Helper: normalize H timeframes to minutes for security() ===
+f_norm_tf(tf) =>
+    string out = tf
+    if tf == "12H"
+        out := "720"
+    else if tf == "8H"
+        out := "480"
+    else if tf == "6H"
+        out := "360"
+    else if tf == "4H"
+        out := "240"
+    else if tf == "3H"
+        out := "180"
+    else if tf == "2H"
+        out := "120"
+    else if tf == "1H"
+        out := "60"
+    out
+src_tf = f_norm_tf(src_tf_in)
+
+// === Sources ===
+total3  = request.security("CRYPTOCAP:TOTAL3",   src_tf, close, barmerge.gaps_off, barmerge.lookahead_off)
+othersD = request.security("CRYPTOCAP:OTHERS.D", src_tf, close, barmerge.gaps_off, barmerge.lookahead_off)
+ethbtc  = request.security("BINANCE:ETHBTC",     src_tf, close, barmerge.gaps_off, barmerge.lookahead_off)
+
+// === Composite ratio ===   (TOTAL3 * OTHERS.D) / ETHBTC
+ratio_raw = ethbtc != 0 ? (total3 * othersD) / ethbtc : na
+
+// % отклонение от WMA(lenSlow) + сглаживание
+base   = ta.wma(ratio_raw, lenSlow)
+ratioN = base != 0 ? (ratio_raw / base - 1) * 100 : na
+ratio  = ta.wma(ratioN, smoothK)
+
+// Trend MAs
+wmaFast = ta.wma(ratio, lenFast)
+wmaSlow = ta.wma(ratio, lenSlow)
+
+// Logic
+riskOn      = ratio > wmaSlow
+riskOff     = ratio < wmaSlow
+impulseUp   = ta.crossover(ratio, wmaFast)
+impulseDown = ta.crossunder(ratio, wmaFast)
+regimeUp    = ta.crossover(ratio, wmaSlow)
+regimeDown  = ta.crossunder(ratio, wmaSlow)
+
+// === Plots ===
+plot(ratio,    "Alt-Market Ratio %", color=ratioClr, linewidth=2)
+plot(wmaFast,  "WMA Fast",           color=fastClr)
+plot(wmaSlow,  "WMA Slow",           color=slowClr)
+
+// === Markers (size must be const; включаем соответствующую серию условием) ===
+bool sTiny   = markSize == "tiny"
+bool sSmall  = markSize == "small"
+bool sNormal = markSize == "normal"
+bool sLarge  = markSize == "large"
+
+// Regime UP/DOWN
+plotshape(showMarks and sTiny   and regimeUp,   "Regime UP tiny",   shape.triangleup,   location.bottom, regUpClr, size=size.tiny)
+plotshape(showMarks and sSmall  and regimeUp,   "Regime UP small",  shape.triangleup,   location.bottom, regUpClr, size=size.small)
+plotshape(showMarks and sNormal and regimeUp,   "Regime UP normal", shape.triangleup,   location.bottom, regUpClr, size=size.normal)
+plotshape(showMarks and sLarge  and regimeUp,   "Regime UP large",  shape.triangleup,   location.bottom, regUpClr, size=size.large)
+
+plotshape(showMarks and sTiny   and regimeDown, "Regime DN tiny",   shape.triangledown, location.top,    regDnClr, size=size.tiny)
+plotshape(showMarks and sSmall  and regimeDown, "Regime DN small",  shape.triangledown, location.top,    regDnClr, size=size.small)
+plotshape(showMarks and sNormal and regimeDown, "Regime DN normal", shape.triangledown, location.top,    regDnClr, size=size.normal)
+plotshape(showMarks and sLarge  and regimeDown, "Regime DN large",  shape.triangledown, location.top,    regDnClr, size=size.large)
+
+// Momentum UP/DOWN
+plotshape(showMarks and sTiny   and impulseUp,   "Momentum UP tiny",   shape.circle, location.bottom, impUpClr, size=size.tiny)
+plotshape(showMarks and sSmall  and impulseUp,   "Momentum UP small",  shape.circle, location.bottom, impUpClr, size=size.small)
+plotshape(showMarks and sNormal and impulseUp,   "Momentum UP normal", shape.circle, location.bottom, impUpClr, size=size.normal)
+plotshape(showMarks and sLarge  and impulseUp,   "Momentum UP large",  shape.circle, location.bottom, impUpClr, size=size.large)
+
+plotshape(showMarks and sTiny   and impulseDown, "Momentum DN tiny",   shape.circle, location.top, impDnClr, size=size.tiny)
+plotshape(showMarks and sSmall  and impulseDown, "Momentum DN small",  shape.circle, location.top, impDnClr, size=size.small)
+plotshape(showMarks and sNormal and impulseDown, "Momentum DN normal", shape.circle, location.top, impDnClr, size=size.normal)
+plotshape(showMarks and sLarge  and impulseDown, "Momentum DN large",  shape.circle, location.top, impDnClr, size=size.large)
+
+// Background shading
+bgcolor(useBg ? (riskOn ? color.new(bgOnClr, transpBg) : riskOff ? color.new(bgOffClr, transpBg) : na) : na)
+
+// === Status table (крупнее и короче) ===
+var tbl = table.new(position.top_right, 1, 3, border_color=color.new(color.white, 70))
+if barstate.islast and showTable
+    col = riskOn ? bgOnClr : riskOff ? bgOffClr : color.new(color.orange, 0)
+    titleStr = riskOn ? "RISK-ON" : riskOff ? "RISK-OFF" : "NEUTRAL"
+    table.cell(tbl, 0, 0, "ALT MARKET ("+src_tf_in+")", text_color=color.white, text_size=tblInfoSz,  bgcolor=color.new(color.black, 0))
+    table.cell(tbl, 0, 1, titleStr,                      text_color=color.white, text_size=tblTitleSz, bgcolor=col)
+    info = "ratio " + str.tostring(ratio, "#.#") + "  |  WMA "+str.tostring(lenFast)+"/"+str.tostring(lenSlow)
+    table.cell(tbl, 0, 2, info,                          text_color=color.white, text_size=tblInfoSz,  bgcolor=color.new(color.black, 0))
+
+// === BIG Badge ===
+var label badge = na
+if barstate.islast and showBadge
+    if na(badge)
+        badge := label.new(bar_index, ratio, "", style=label.style_label_right, textcolor=color.white)
+    bText = riskOn ? "RISK-ON" : riskOff ? "RISK-OFF" : "NEUTRAL"
+    bBg   = riskOn ? bgOnClr : riskOff ? bgOffClr : color.new(color.orange, 0)
+    pad   = str.repeat(" ", math.round(badgeScale/20.0))
+    label.set_text(badge, pad + bText + pad)
+    label.set_color(badge, bBg)
+    label.set_textcolor(badge, color.white)
+    label.set_size(badge, badgeScale >= 140 ? size.large : badgeScale >= 110 ? size.normal : size.small)
+    if badgePos == "top_right"
+        label.set_x(badge, bar_index)
+        label.set_y(badge, na)
+    else
+        label.set_x(badge, bar_index - 50)
+        label.set_y(badge, na)
+
+// === Alerts (const strings) ===
+alertcondition(regimeUp,    "Regime UP (Risk-ON)",    "Alt-Market Regime: RISK-ON (ratio crossed ABOVE Slow WMA)")
+alertcondition(regimeDown,  "Regime DOWN (Risk-OFF)", "Alt-Market Regime: RISK-OFF (ratio crossed BELOW Slow WMA)")
+alertcondition(impulseUp,   "Momentum UP (Fast X)",   "Alt-Market: momentum UP (ratio crossed ABOVE Fast WMA)")
+alertcondition(impulseDown, "Momentum DOWN (Fast X)", "Alt-Market: momentum DOWN (ratio crossed BELOW Fast WMA)")
+// === Divergences (price vs ratio) ===
+showDiv = input.bool(true, "Show divergences")
+
+ratioHigh = ta.pivothigh(ratio, 3, 3)
+ratioLow  = ta.pivotlow(ratio, 3, 3)
+priceHigh = ta.pivothigh(close, 3, 3)
+priceLow  = ta.pivotlow(close, 3, 3)
