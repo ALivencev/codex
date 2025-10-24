@@ -2,6 +2,7 @@ use anyhow::Error as AnyhowError;
 use keyring::Entry;
 use std::error::Error;
 use std::fmt;
+use std::fmt::Debug;
 
 #[derive(Debug)]
 pub struct CredentialStoreError(AnyhowError);
@@ -26,12 +27,13 @@ impl fmt::Display for CredentialStoreError {
 impl Error for CredentialStoreError {}
 
 /// Shared credential store abstraction for keyring-backed implementations.
-pub trait KeyringStore: Send + Sync {
+pub trait KeyringStore: Debug + Send + Sync {
     fn load(&self, service: &str, account: &str) -> Result<Option<String>, CredentialStoreError>;
     fn save(&self, service: &str, account: &str, value: &str) -> Result<(), CredentialStoreError>;
     fn delete(&self, service: &str, account: &str) -> Result<bool, CredentialStoreError>;
 }
 
+#[derive(Debug)]
 pub struct DefaultKeyringStore;
 
 impl KeyringStore for DefaultKeyringStore {
@@ -69,7 +71,7 @@ pub mod testing {
     use std::sync::Arc;
     use std::sync::Mutex;
 
-    #[derive(Default, Clone)]
+    #[derive(Default, Clone, Debug)]
     pub struct MockKeyringStore {
         credentials: Arc<Mutex<HashMap<String, Arc<MockCredential>>>>,
     }
