@@ -19,6 +19,9 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use codex_app_server_protocol::AuthMode;
+use codex_keyring_store::CredentialStoreError;
+use codex_keyring_store::DefaultKeyringStore;
+use codex_keyring_store::KeyringStore;
 use codex_protocol::config_types::ForcedLoginMethod;
 
 use crate::config::Config;
@@ -33,7 +36,10 @@ pub enum AuthCredentialsStoreMode {
     #[default]
     /// Persist credentials in CODEX_HOME/auth.json.
     File,
-    // TODO: Implement keyring support.
+    /// Persist credentials in the keyring. Fail if unavailable.
+    Keyring,
+    /// Use keyring when available; otherwise, fall back to a file in CODEX_HOME.
+    Auto,
 }
 
 trait AuthStorageBackend: Debug + Send + Sync {
